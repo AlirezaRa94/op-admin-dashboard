@@ -23,6 +23,7 @@ import pandas as pd
 
 # e-mission modules
 import emission.core.get_database as edb
+import emission.core.wrapper.user as ecwu
 
 # Data/file handling imports
 import pathlib
@@ -189,6 +190,18 @@ def query_confirmed_trips(start_date, end_date):
     if end_date is not None:
         end_time = datetime.combine(end_date, datetime.max.time())
         query['$and'][1]['data.start_ts']['$lt'] = end_time.timestamp()
+
+    tokens_file = os.getcwd() + '/data/tokens.csv'
+    try:
+        with open(tokens_file) as f:
+            tokens = list()
+            for token in f:
+                tokens.append(token.strip())
+            uuids = [ecwu.User.fromEmail(token).uuid for token in tokens]
+            query['$and'].append({'user_id': {'$in': uuids}})
+    except Exception as e:
+        print(e)
+
 
     projection = {
         '_id': 0,
