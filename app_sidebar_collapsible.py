@@ -180,7 +180,6 @@ def query_confirmed_trips(start_date, end_date):
         '$and': [
             {'metadata.key': 'analysis/confirmed_trip'},
             {'data.start_ts': {'$exists': True}},
-            {'data.user_input.trip_user_input': {'$exists': False}},
         ]
     }
     if start_date is not None:
