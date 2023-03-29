@@ -9,10 +9,13 @@ from dash import dcc, html, Input, Output, callback, State, register_page, dash_
 from emission.storage.decorations.token_queries import insert_many_tokens
 import emission.core.get_database as edb
 
-from opadmindash.generate_qr_codes import saveAsQRCode
-from opadmindash.generate_random_tokens import generateRandomTokensForProgram
+from utils.generate_qr_codes import saveAsQRCode
+from utils.generate_random_tokens import generateRandomTokensForProgram
+from utils.permissions import get_token_prefix, has_permission
 
-register_page(__name__, path="/tokens")
+
+if has_permission('token_generate'):
+    register_page(__name__, path="/tokens")
 
 intro = """## Tokens"""
 QRCODE_PATH = 'assets/qrcodes'
@@ -54,6 +57,18 @@ layout = html.Div(
                     dcc.Dropdown(options=['url safe', 'hex', 'base64'], value='url safe', id='token-format'),
 
                     html.Br(),
+                    dcc.Checklist(
+                        className='radio-items',
+                        id='token-checklist',
+                        options=[{'label': 'For Testing', 'value': 'test-token'}],
+                        value=[],
+                        style={
+                            'padding': '5px',
+                            'margin': 'auto'
+                        }
+                    ),
+
+                    html.Br(),
                     html.Div([
                         html.Button(children='Generate Tokens', id='token-generate', n_clicks=0, style={
                             'font-size': '14px', 'width': '140px', 'display': 'block', 'margin-bottom': '10px',
@@ -89,10 +104,12 @@ layout = html.Div(
     State('token-length', 'value'),
     State('token-count', 'value'),
     State('token-format', 'value'),
+    State('token-checklist', 'value'),
 )
-def generate_tokens(n_clicks, program, token_length, token_count, out_format):
+def generate_tokens(n_clicks, program, token_length, token_count, out_format, checklist):
     if n_clicks is not None and n_clicks > 0:
-        tokens = generateRandomTokensForProgram(program, token_length, token_count, out_format)
+        token_prefix = get_token_prefix() + program + ('_test' if 'test-token' in checklist else '')
+        tokens = generateRandomTokensForProgram(token_prefix, token_length, token_count, out_format)
         insert_many_tokens(tokens)
         for token in tokens:
             saveAsQRCode(QRCODE_PATH, token)
@@ -103,7 +120,6 @@ def generate_tokens(n_clicks, program, token_length, token_count, out_format):
 @callback(
     Output('download-token', 'data'),
     Input('token-export', 'n_clicks'),
-    prevent_initial_call=True,
 )
 def export_tokens(n_clicks):
     def zip_directory(bytes_io):
@@ -113,7 +129,9 @@ def export_tokens(n_clicks):
                 for img in files:
                     file_path = os.path.join(root, img)
                     zf.write(file_path, file_path[len_dir_path:])
-    return dcc.send_bytes(zip_directory, "tokens.zip")
+
+    if n_clicks > 0:
+        return dcc.send_bytes(zip_directory, "tokens.zip")
 
 
 def populate_datatable():
@@ -141,7 +159,8 @@ def populate_datatable():
             'textAlign': 'left',
         },
         markdown_options={"html": True},
-        style_table={'overflowX': 'auto'}
+        style_table={'overflowX': 'auto'},
+        export_format='csv',
     )
 
 def query_tokens():

@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    image: openpath/opdash:0.0.1
+    image: e-mission/opdash:0.0.1
     ports:
       - "8050:8050"
     environment:
@@ -14,12 +14,15 @@ services:
       DB_HOST: localhost
       WEB_SERVER_HOST: 0.0.0.0
       SERVER_BRANCH: master
+      CONFIG_PATH: "https://raw.githubusercontent.com/AlirezaRa94/nrel-openpath-deploy-configs/main/configs/"
+      STUDY_NAME: "admin-dashboard-permissions"
+      AUTH_TYPE: "basic" # the other option is cognito
 #    networks:
 #       - emission
     network_mode: host
     volumes:
       - ./pages:/usr/src/app/pages
-      - ./opadmindash:/usr/src/app/opadmindash
+      - ./utils:/usr/src/app/utils
       - ./app.py:/usr/src/app/app.py
       - ./app_sidebar_collapsible.py:/usr/src/app/app_sidebar_collapsible.py
     deploy:

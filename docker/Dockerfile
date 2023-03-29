@@ -15,10 +15,11 @@ RUN bash -c "./dashboard_setup/setup.sh"
 WORKDIR /usr/src/app/pages
 COPY ./pages ./
 WORKDIR /usr/src/app
-COPY app.py app_sidebar_collapsible.py assets globals.py globalsUpdater.py Procfile ./
+COPY app.py config.py app_sidebar_collapsible.py assets globals.py globalsUpdater.py Procfile ./
 
 WORKDIR /usr/src/app/assets
 COPY assets/style.css ./
+RUN mkdir qrcodes
 
 # copy over test data
 WORKDIR /usr/src/app/data

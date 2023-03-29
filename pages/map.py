@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 
 import emission.core.wrapper.user as ecwu
 
-from opadmindash.permissions import has_permission
+from utils.permissions import has_permission
 
 register_page(__name__, path="/map")
 
@@ -21,30 +21,26 @@ intro = """## Map"""
 
 
 def create_lines_map(trips_group_by_user_id, user_id_list):
-    fig = go.Figure()
     start_lon, start_lat = 0, 0
+    traces = []
     for user_id in user_id_list:
         color = trips_group_by_user_id[user_id]['color']
         trips = trips_group_by_user_id[user_id]['trips']
-        start_coordinates = [trip['start_coordinates'] for trip in trips]
-        end_coordinates = [trip['end_coordinates'] for trip in trips]
-        n = len(start_coordinates)
 
-        for i in range(n):
+        for i, trip in enumerate(trips):
             if i == 0:
-                start_lon = start_coordinates[i][0]
-                start_lat = end_coordinates[i][1]
-
-            fig.add_trace(
+                start_lon = trip['start_coordinates'][0]
+                start_lat = trip['start_coordinates'][1]
+            traces.append(
                 go.Scattermapbox(
                     mode="markers+lines",
-                    lon=[start_coordinates[i][0], end_coordinates[i][0]],
-                    lat=[start_coordinates[i][1], end_coordinates[i][1]],
+                    lon=[trip['start_coordinates'][0], trip['end_coordinates'][0]],
+                    lat=[trip['start_coordinates'][1], trip['end_coordinates'][1]],
                     marker={'size': 10, 'color': color},
-                    legendrank=i + 1,
                 )
             )
 
+    fig = go.Figure(data=traces)
     fig.update_layout(
         showlegend=False,
         margin={'l': 0, 't': 30, 'b': 0, 'r': 0},
@@ -60,11 +56,13 @@ def create_lines_map(trips_group_by_user_id, user_id_list):
 
 def create_heatmap_fig(data):
     fig = go.Figure()
-    if len(data['lat']) > 0:
-        fig.add_trace(go.Densitymapbox(
-            lon=data['lon'],
-            lat=data['lat'],
-        ))
+    if len(data.get('lat', [])) > 0:
+        fig.add_trace(
+            go.Densitymapbox(
+                lon=data['lon'],
+                lat=data['lat'],
+            )
+        )
         fig.update_layout(
             mapbox_style='open-street-map',
             mapbox_center_lon=data['lon'][0],
@@ -78,7 +76,7 @@ def create_heatmap_fig(data):
 
 def create_bubble_fig(data):
     fig = go.Figure()
-    if len(data['lon']) > 0:
+    if len(data.get('lon', [])) > 0:
         fig.add_trace(
             go.Scattermapbox(
                 lat=data['lat'],
@@ -142,6 +140,14 @@ def create_user_emails_options(trips_group_by_user_id):
             options.append(create_single_option(user_email, color))
     return options, user_emails
 
+map_type_options = []
+if has_permission('map_heatmap'):
+    map_type_options.append({'label': 'Density Heatmap', 'value': 'heatmap'})
+if has_permission('map_bubble'):
+    map_type_options.append({'label': 'Bubble Map', 'value': 'bubble'})
+if has_permission('map_trip_lines'):
+    map_type_options.append({'label': 'Trips Lines', 'value': 'lines'})
+
 
 layout = html.Div(
     [
@@ -152,11 +158,7 @@ layout = html.Div(
             dbc.Col(
                 [
                     html.Label('Map Type'),
-                    dcc.Dropdown(id='map-type-dropdown', value='', options=[
-                        {'label': 'Density Heatmap', 'value': 'heatmap', 'disabled': not has_permission('map_heatmap')},
-                        {'label': 'Bubble Map', 'value': 'bubble', 'disabled': not has_permission('map_bubble')},
-                        {'label': 'Trips Lines', 'value': 'lines', 'disabled': not has_permission('map_trip_lines')},
-                    ]),
+                    dcc.Dropdown(id='map-type-dropdown', value='', options=map_type_options),
                 ],
                 xl=3,
                 lg=4,
@@ -168,11 +170,11 @@ layout = html.Div(
             dbc.Col([
                 html.Label('User UUIDs'),
                 dcc.Dropdown(id='user-id-dropdown', multi=True),
-            ]),
+            ], style={'display': 'block' if has_permission('options_uuids') else 'none'}),
             dbc.Col([
                 html.Label('User Emails'),
                 dcc.Dropdown(id='user-email-dropdown', multi=True),
-            ])
+            ], style={'display': 'block' if has_permission('options_emails') else 'none'})
         ]),
 
         dbc.Row(
@@ -221,11 +223,11 @@ def update_output(map_type, selected_user_ids, selected_user_emails, trips_data)
             user_ids.add(str(ecwu.User.fromEmail(user_email).uuid))
 
     if map_type == 'lines':
-        return create_lines_map(trips_data['users_data'], user_ids)
+        return create_lines_map(trips_data.get('users_data', {}), user_ids)
     elif map_type == 'heatmap':
-        return create_heatmap_fig(trips_data['coordinates'])
+        return create_heatmap_fig(trips_data.get('coordinates', {}))
     elif map_type == 'bubble':
-        return create_bubble_fig(trips_data['coordinates'])
+        return create_bubble_fig(trips_data.get('coordinates', {}))
     else:
         return go.Figure()
 

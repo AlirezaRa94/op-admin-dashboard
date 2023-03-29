@@ -1,49 +1,46 @@
 """
-This app creates an animated sidebar using the dbc.Nav component and some local
-CSS. Each menu item has an icon, when the sidebar is collapsed the labels
-disappear and only the icons remain. Visit www.fontawesome.com to find
-alternative icons to suit your needs!
+This app creates an animated sidebar using the dbc.Nav component and some local CSS. Each menu item has an icon, when
+the sidebar is collapsed the labels disappear and only the icons remain. Visit www.fontawesome.com to find alternative
+icons to suit your needs!
 
-dcc.Location is used to track the current location, a callback uses the current
-location to render the appropriate page content. The active prop of each
-NavLink is set automatically according to the current pathname. To use this
-feature you must install dash-bootstrap-components >= 0.11.0.
+dcc.Location is used to track the current location, a callback uses the current location to render the appropriate page
+content. The active prop of each NavLink is set automatically according to the current pathname. To use this feature you
+must install dash-bootstrap-components >= 0.11.0.
 
-For more details on building multi-page Dash applications, check out the Dash
-documentation: https://dash.plot.ly/urls
+For more details on building multi-page Dash applications, check out the Dash documentation: https://dash.plot.ly/urls
 """
+import os
+from datetime import date
+
 import dash
 import dash_bootstrap_components as dbc
-from dash import Input, Output, dcc, html
-import os
-from datetime import datetime, date, timezone
+from dash import Input, Output, dcc, html, Dash
+import dash_auth
 
-# Etc
-import pandas as pd
+from utils.db_utils import query_uuids, query_confirmed_trips
+from utils.permissions import has_permission
 
-# e-mission modules
-import emission.core.get_database as edb
-import emission.core.wrapper.user as ecwu
 
-# Data/file handling imports
-import pathlib
-
-from opadmindash.permissions import get_trips_columns, has_permission
 
 OPENPATH_LOGO = "https://www.nrel.gov/transportation/assets/images/openpath-logo.jpg"
+auth_type = os.getenv('AUTH_TYPE')
 
-#------------------------------------------------#
-# Set the data path
-#------------------------------------------------#
 
-# For data that lives within the application.
-# Set the path to the data directory
-DATA_PATH = pathlib.Path(__file__).parent.joinpath("./data/").resolve()
+if auth_type == 'cognito':
+    from utils.cognito_utils import authenticate_user, get_cognito_login_page
+elif auth_type == 'basic':
+    from config import VALID_USERNAME_PASSWORD_PAIRS
 
-app = dash.Dash(
+app = Dash(
     external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME],
-    use_pages=True
+    suppress_callback_exceptions=True,
+    use_pages=True,
 )
+if auth_type == 'basic':
+    auth = dash_auth.BasicAuth(
+        app,
+        VALID_USERNAME_PASSWORD_PAIRS
+    )
 
 
 sidebar = html.Div(
@@ -83,7 +80,7 @@ sidebar = html.Div(
                     ],
                     href="/tokens",
                     active="exact",
-                    disabled=not has_permission("token_generate"),
+                    style={'display': 'block' if has_permission('token_generate') else 'none'},
                 ),
                 dbc.NavLink(
                     [
@@ -100,7 +97,7 @@ sidebar = html.Div(
                     ],
                     href="/push_notification",
                     active="exact",
-                    disabled=not has_permission("push_send"),
+                    style={'display': 'block' if has_permission('push_send') else 'none'},
                 ),
                 dbc.NavLink(
                     [
@@ -120,6 +117,7 @@ sidebar = html.Div(
 
 
 content = html.Div([
+    # Global Date Picker
     html.Div(
         dcc.DatePickerRange(
             id='date-picker',
@@ -131,135 +129,90 @@ content = html.Div([
             initial_visible_month=date.today(),
         ), style={'margin': '10px 10px 0 0', 'display': 'flex', 'justify-content': 'right'}
     ),
-    html.Div(dash.page_container, style={
-        "margin-left": "5rem",
-        "margin-right": "2rem",
-        "padding": "2rem 1rem",
-    }),
+
+    # Pages Content
+    dcc.Loading(
+        type='default',
+        fullscreen=True,
+        children=html.Div(dash.page_container, style={
+            "margin-left": "5rem",
+            "margin-right": "2rem",
+            "padding": "2rem 1rem",
+        })
+    ),
 ])
+
+
+home_page = [
+    sidebar,
+    content,
+]
 
 
 app.layout = html.Div(
     [
-        dcc.Location(id="url"), 
-        sidebar, 
-        content,
-        dcc.Store(id="store-trips", data={}),
-        dcc.Store(id="store-uuids", data={}),
-        dcc.Interval(id='interval-component', interval=60*1000, n_intervals=0),
+        dcc.Location(id='url', refresh=False),
+        dcc.Store(id='store-trips', data={}),
+        dcc.Store(id='store-uuids', data={}),
+        html.Div(id='page-content', children=home_page),
     ]
 )
-
-
-def query_uuids(start_date, end_date):
-    query = {'update_ts': {'$exists': True}}
-    if start_date is not None:
-        start_time = datetime.combine(start_date, datetime.min.time()).astimezone(timezone.utc)
-        query['update_ts']['$gte'] = start_time
-
-    if end_date is not None:
-        end_time = datetime.combine(end_date, datetime.max.time()).astimezone(timezone.utc)
-        query['update_ts']['$lt'] = end_time
-
-    projection = {
-        '_id': 0,
-        'user_id': '$uuid',
-        'user_token': '$user_email',
-        'update_ts': 1
-    }
-
-    query_result = edb.get_uuid_db().find(query, projection)
-    df = pd.json_normalize(list(query_result))
-    if not df.empty:
-        df['update_ts'] = pd.to_datetime(df['update_ts'])
-        df['user_id'] = df['user_id'].apply(str)
-    return df
-
-def query_confirmed_trips(start_date, end_date):
-    query = {
-        '$and': [
-            {'metadata.key': 'analysis/confirmed_trip'},
-            {'data.start_ts': {'$exists': True}},
-        ]
-    }
-    if start_date is not None:
-        start_time = datetime.combine(start_date, datetime.min.time())
-        query['$and'][1]['data.start_ts']['$gte'] = start_time.timestamp()
-
-    if end_date is not None:
-        end_time = datetime.combine(end_date, datetime.max.time())
-        query['$and'][1]['data.start_ts']['$lt'] = end_time.timestamp()
-
-    tokens_file = os.getcwd() + '/data/tokens.csv'
-    try:
-        with open(tokens_file) as f:
-            tokens = list()
-            for token in f:
-                tokens.append(token.strip())
-            uuids = [ecwu.User.fromEmail(token).uuid for token in tokens]
-            query['$and'].append({'user_id': {'$in': uuids}})
-    except Exception as e:
-        print(e)
-
-
-    projection = {
-        '_id': 0,
-        'user_id': 1,
-        'trip_start_time_str': '$data.start_fmt_time',
-        'trip_end_time_str': '$data.end_fmt_time',
-        'timezone': '$data.start_local_dt.timezone',
-        'start_coordinates': '$data.start_loc.coordinates',
-        'end_coordinates': '$data.end_loc.coordinates',
-        'travel_modes': '$data.user_input.trip_user_input.data.jsonDocResponse.data.travel_mode',
-    }
-
-    for column in get_trips_columns():
-        projection[column] = 1
-
-    query_result = edb.get_analysis_timeseries_db().find(query, projection)
-    df = pd.json_normalize(list(query_result))
-    if not df.empty:
-        df['user_id'] = df['user_id'].apply(str)
-        if 'data.start_place' in df.columns:
-            df['data.start_place'] = df['data.start_place'].apply(str)
-        if 'data.end_place' in df.columns:
-            df['data.end_place'] = df['data.end_place'].apply(str)
-    return df
 
 
 # Load data stores
 @app.callback(
     Output("store-uuids", "data"),
-    Input('interval-component', 'n_intervals'),
     Input('date-picker', 'start_date'),
     Input('date-picker', 'end_date'),
 )
-def update_store_uuids(n_intervals, start_date, end_date):
+def update_store_uuids(start_date, end_date):
     start_date_obj = date.fromisoformat(start_date) if start_date else None
     end_date_obj = date.fromisoformat(end_date) if end_date else None
     dff = query_uuids(start_date_obj, end_date_obj)
+    records = dff.to_dict("records")
     store = {
-        "data": dff.to_dict("records"),
-        "columns": [{"name": i, "id": i} for i in dff.columns],
+        "data": records,
+        "length": len(records),
     }
     return store
 
 
 @app.callback(
     Output("store-trips", "data"),
-    Input('interval-component', 'n_intervals'),
     Input('date-picker', 'start_date'),
     Input('date-picker', 'end_date'),
 )
-def update_store_trips(n_intervals, start_date, end_date):
+def update_store_trips(start_date, end_date):
     start_date_obj = date.fromisoformat(start_date) if start_date else None
     end_date_obj = date.fromisoformat(end_date) if end_date else None
     df = query_confirmed_trips(start_date_obj, end_date_obj)
+    records = df.to_dict("records")
     store = {
-        "data": df.to_dict("records"),
-        "columns": [{"name": i, "id": i} for i in df.columns],
+        "data": records,
+        "length": len(records),
     }
     return store
+
+
+# Define the callback to display the page content based on the URL path
+@app.callback(
+    Output('page-content', 'children'),
+    Input('url', 'search'),
+)
+def display_page(search):
+    if auth_type == 'cognito':
+        try:
+            is_authenticated = authenticate_user(search)
+        except Exception as e:
+            print(e)
+            return get_cognito_login_page('Unsuccessful authentication, try again.', 'red')
+
+        if is_authenticated:
+            return home_page
+        return get_cognito_login_page()
+
+    return home_page
+
 
 
 if __name__ == "__main__":
