@@ -33,3 +33,23 @@ def get_uuids_columns():
 
 def get_token_prefix():
     return permissions['token_prefix'] + '_' if permissions.get('token_prefix') else ''
+
+
+def get_additional_trip_columns():
+    additional_columns = {
+        'trip_start_time_str': '$data.start_fmt_time',
+        'trip_end_time_str': '$data.end_fmt_time',
+        'timezone': '$data.start_local_dt.timezone',
+        'start_coordinates': '$data.start_loc.coordinates',
+        'end_coordinates': '$data.end_loc.coordinates',
+        'travel_mode': '$data.user_input.trip_user_input.data.jsonDocResponse.data.travel_mode',
+        'platform': '$metadata.platform',
+        'user_input_timezone': '$data.user_input.trip_user_input.metadata.write_local_dt.timezone',
+        'label': '$data.user_input.trip_user_input.data.label',
+        'purpose': '$data.user_input.trip_user_input.data.jsonDocResponse.data.destination_purpose',
+        'survey': '$data.user_input.trip_user_input.data.name',
+        'duration': '$data.duration',
+        'distance': '$data.distance',
+    }
+
+    return additional_columns

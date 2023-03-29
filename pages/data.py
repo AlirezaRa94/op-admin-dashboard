@@ -48,12 +48,13 @@ def render_content(tab, store_uuids, store_trips):
     if df.empty or not has_perm:
         return None
 
-    df = df.drop(columns=[col for col in df.columns if col not in columns])
+    # df = df.drop(columns=[col for col in df.columns if col not in columns])
+    # print(df.columns, 'hi')
 
-    if 'data.start_loc.coordinates' in df.columns:
-        df['data.start_loc.coordinates'] = df['data.start_loc.coordinates'].apply(lambda x: f'({x[0]}, {x[1]})')
-    if 'data.end_loc.coordinates' in df.columns:
-        df['data.end_loc.coordinates'] = df['data.end_loc.coordinates'].apply(lambda x: f'({x[0]}, {x[1]})')
+    if 'start_coordinates' in df.columns:
+        df['start_coordinates'] = df['start_coordinates'].apply(lambda x: f'({x[0]}, {x[1]})')
+    if 'end_coordinates' in df.columns:
+        df['end_coordinates'] = df['end_coordinates'].apply(lambda x: f'({x[0]}, {x[1]})')
 
     return populate_datatable(df)
 
