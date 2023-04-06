@@ -9,7 +9,7 @@ from dash import dcc, html, Input, Output, callback, register_page, dash_table
 import pandas as pd
 from dash.exceptions import PreventUpdate
 
-from utils.permissions import has_permission, get_uuids_columns, get_trips_columns
+from utils.permissions import has_permission, get_uuids_columns, get_trips_columns, get_additional_trip_columns
 
 register_page(__name__, path="/data")
 
@@ -43,13 +43,13 @@ def render_content(tab, store_uuids, store_trips):
     elif tab == 'tab-trips-datatable':
         data = store_trips["data"]
         columns = get_trips_columns()
+        columns.update(set(col['label'] for col in get_additional_trip_columns()))
         has_perm = has_permission('data_trips')
     df = pd.DataFrame(data)
     if df.empty or not has_perm:
         return None
 
-    # df = df.drop(columns=[col for col in df.columns if col not in columns])
-    # print(df.columns, 'hi')
+    df = df.drop(columns=[col for col in df.columns if col not in columns])
 
     if 'start_coordinates' in df.columns:
         df['start_coordinates'] = df['start_coordinates'].apply(lambda x: f'({x[0]}, {x[1]})')

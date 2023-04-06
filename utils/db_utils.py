@@ -61,12 +61,18 @@ def query_confirmed_trips(start_date, end_date):
     projection = {
         '_id': 0,
         'user_id': 1,
+        'trip_start_time_str': '$data.start_fmt_time',
+        'trip_end_time_str': '$data.end_fmt_time',
+        'timezone': '$data.start_local_dt.timezone',
+        'start_coordinates': '$data.start_loc.coordinates',
+        'end_coordinates': '$data.end_loc.coordinates',
     }
-
-    projection.update(get_additional_trip_columns())
 
     # for column in get_trips_columns():
     #     projection[column] = 1
+
+    for column in get_additional_trip_columns():
+        projection[column['label']] = column['path']
 
     query_result = edb.get_analysis_timeseries_db().find(query, projection)
     df = pd.json_normalize(list(query_result))

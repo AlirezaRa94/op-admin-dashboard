@@ -36,20 +36,21 @@ def get_token_prefix():
 
 
 def get_additional_trip_columns():
-    additional_columns = {
-        'trip_start_time_str': '$data.start_fmt_time',
-        'trip_end_time_str': '$data.end_fmt_time',
-        'timezone': '$data.start_local_dt.timezone',
-        'start_coordinates': '$data.start_loc.coordinates',
-        'end_coordinates': '$data.end_loc.coordinates',
-        'travel_mode': '$data.user_input.trip_user_input.data.jsonDocResponse.data.travel_mode',
-        'platform': '$metadata.platform',
-        'user_input_timezone': '$data.user_input.trip_user_input.metadata.write_local_dt.timezone',
-        'label': '$data.user_input.trip_user_input.data.label',
-        'purpose': '$data.user_input.trip_user_input.data.jsonDocResponse.data.destination_purpose',
-        'survey': '$data.user_input.trip_user_input.data.name',
-        'duration': '$data.duration',
-        'distance': '$data.distance',
-    }
+    additional_columns = permissions.get('additional_trip_columns', [])
+    additional_columns.extend([
+        {'label': 'trip_start_time_str', 'path': '$data.start_fmt_time'},
+        {'label': 'trip_end_time_str', 'path': '$data.end_fmt_time'},
+        {'label': 'timezone', 'path': '$data.start_local_dt.timezone'},
+        {'label': 'start_coordinates', 'path': '$data.start_loc.coordinates'},
+        {'label': 'end_coordinates', 'path': '$data.end_loc.coordinates'},
+        {'label': 'travel_mode', 'path': '$data.user_input.trip_user_input.data.jsonDocResponse.data.travel_mode'},
+        {'label': 'platform', 'path': '$metadata.platform'},
+        {'label': 'user_input_timezone', 'path': '$data.user_input.trip_user_input.metadata.write_local_dt.timezone'},
+        {'label': 'label', 'path': '$data.user_input.trip_user_input.data.label'},
+        {'label': 'purpose', 'path': '$data.user_input.trip_user_input.data.jsonDocResponse.data.destination_purpose'},
+        {'label': 'survey', 'path': '$data.user_input.trip_user_input.data.name'},
+        {'label': 'duration', 'path': '$data.duration'},
+        {'label': 'distance', 'path': '$data.distance'},
+    ])
 
     return additional_columns
