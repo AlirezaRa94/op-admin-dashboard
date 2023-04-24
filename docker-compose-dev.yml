@@ -41,8 +41,8 @@ services:
 #    ports:
 #      - "27017:27017"
 
-networks:
-  emission:
+#networks:
+#  emission:
 
-volumes:
-  mongo-data:
+#volumes:
+#  mongo-data:
